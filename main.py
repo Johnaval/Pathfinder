@@ -1,11 +1,79 @@
 from tkinter import *
 import time
+import math
+
+width = 500
+height = 500
+rect_side = 20
+
+class Spot:
+    def __init__(self, i, j):
+        self.i = i
+        self.j = j
+        self.f = 0
+        self.g = 0
+        self.h = 0
+        self.value = 0
+        self.color = 'white'
+        self.neighbors = []
+        self.previous = 0
+
+    def add_neighbors(self, grid):
+        #neighbors = [[-1,0], [0,-1], [0,1], [1,0]]
+        neighbors = [[-1,-1], [-1,0], [-1,1], [0,1], [1,1], [1,0], [1,-1], [0,-1]]
+        for neighbor in neighbors:
+            if self.i+neighbor[0] >= 0 and self.i+neighbor[0] < len(grid[0]) and self.j+neighbor[1] >= 0 and self.j+neighbor[1] < len(grid) and (self.i+neighbor[0] != game.start.i or self.j+neighbor[1] != game.start.j):
+                self.neighbors.append(grid[self.i+neighbor[0]][self.j+neighbor[1]])
+
+    def set_color(self):
+        if self.value == 0:
+            color = 'white'
+        elif self.value == 1:
+            color = 'black'
+        elif self.value == 2:
+            color = 'pink'
+        elif self.value == 3:
+            color = 'red'
+        elif self.value == 4:
+            color = 'magenta'
+        elif self.value == 5:
+            color = 'blue'
+        self.color = color
+    
+    def get_color(self):
+        return self.color
+
+    def set_value(self, value):
+        self.value = value
+        self.set_color()
+
+    def get_value(self):
+        return self.value
+
+class Game:
+    def __init__(self):
+        self.grid = [[Spot(i,j) for j in range(width//rect_side)] for i in range(height//rect_side)]
+        self.openSet = []
+        self.closedSet = []
+
+    def set_start(self, i, j):
+        self.start = self.grid[i][j]
+        self.openSet.append(self.start)
+
+    def set_end(self, i, j):
+        self.end = self.grid[i][j]
+    
+    def get_color(self, i, j):
+        return self.grid[i][j].get_color()
+
+    def set_value(self, i, j, value):
+        self.grid[i][j].set_value(value)
+
+    def get_value(self, i, j):
+        return self.grid[i][j].get_value()
 
 class GUI:
     def __init__(self):
-        self.width = 500
-        self.height = 500
-        self.rect_side = 20
         self.points = []
 
         self.root = Tk()
@@ -20,10 +88,8 @@ class GUI:
         button = Button(frame, command = self.Run, text = "Run")
         button.grid(row = 0, column = 1, padx = 5, pady = 5)
 
-        self.canvas = Canvas(self.root, bg = 'white', width = self.width, height = self.height, bd = 2, relief = RIDGE)
+        self.canvas = Canvas(self.root, bg = 'white', width = width, height = height, bd = 2, relief = RIDGE)
         self.canvas.grid(row=1, column=0)
-
-        self.game = [[0 for j in range(self.width//self.rect_side)] for i in range(self.height//self.rect_side)]
         
         self.draw_game()
 
@@ -37,32 +103,21 @@ class GUI:
     def draw_game(self):
         self.canvas.delete(ALL)
         increment = 5
-        for i in range(self.width//self.rect_side):
-            for j in range(self.height//self.rect_side):
-                x1 = increment + i * self.rect_side
-                y1 = increment + j * self.rect_side
-                x2 = x1 + self.rect_side
-                y2 = y1 + self.rect_side
-                if self.game[i][j] == 0:
-                    color = 'white'
-                elif self.game[i][j] == 1:
-                    color = 'black'
-                elif self.game[i][j] == 2:
-                    color = 'pink'
-                elif self.game[i][j] == 3:
-                    color = 'red'
-                elif self.game[i][j] == 4:
-                    color = 'magenta'
-                elif self.game[i][j] == 5:
-                    color = 'blue'
+        for i in range(width//rect_side):
+            for j in range(height//rect_side):
+                x1 = increment + i * rect_side
+                y1 = increment + j * rect_side
+                x2 = x1 + rect_side
+                y2 = y1 + rect_side
+                color = game.get_color(i,j)
                 self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, tag = (i,j))
 
     def change_rect_color(self, event, value, color):
         item = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)[0]
         tag = self.canvas.gettags(item)
         i,j = int(tag[0]), int(tag[1])
-        if self.game[i][j] == 0:
-            self.game[i][j] = value
+        if game.get_value(i,j) == 0:
+            game.set_value(i,j,value)
             self.canvas.itemconfig(item, fill=color)
             self.canvas.update()
             
@@ -71,12 +126,23 @@ class GUI:
             self.change_rect_color(event, 1, 'black')
     
     def mouse_click(self, event):
-        if self.mouse_clicked in [2,3]:
+        if self.mouse_clicked == 2:
             item = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)[0]
             tag = self.canvas.gettags(item)
             i,j = int(tag[0]), int(tag[1])
+            game.set_start(i,j)
             self.points.append([i,j])
             self.change_rect_color(event, 2, 'pink')
+        elif self.mouse_clicked == 3:
+            item = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)[0]
+            tag = self.canvas.gettags(item)
+            i,j = int(tag[0]), int(tag[1])
+            game.set_end(i,j)
+            self.points.append([i,j])
+            self.change_rect_color(event, 2, 'pink')
+            for i in range(height//rect_side):
+                for j in range(width//rect_side):
+                    game.grid[i][j].add_neighbors(game.grid)
         else:
             self.change_rect_color(event, 1, 'black')
             self.mouse_clicked = True
@@ -84,54 +150,62 @@ class GUI:
     def mouse_release(self, event):
         self.mouse_clicked = 3 if self.mouse_clicked == 2 else False
 
-    def find_visited(self):
-        neighbors = [[-1,0], [0,-1], [0,1], [1,0]]
-        temp_list = []
-        for i in range(len(self.unvisited_nodes)):
-            for j in range(len(self.unvisited_nodes[0])):
-                if self.unvisited_nodes[i][j][0] in (1,2) and [i,j] not in self.visited_nodes:
-                    self.visited_nodes.append([i,j])
-                    for neighbor in neighbors:
-                        if i+neighbor[0] >= 0 and i+neighbor[0] < len(self.unvisited_nodes[0]) and j+neighbor[1] >= 0 and j+neighbor[1] < len(self.unvisited_nodes):
-                            if self.unvisited_nodes[i+neighbor[0]][j+neighbor[1]][0] == 0:
-                                temp_list.append([i+neighbor[0],j+neighbor[1]])
-                                self.unvisited_nodes[i+neighbor[0]][j+neighbor[1]][1] = self.unvisited_nodes[i][j][1] + 1 if self.unvisited_nodes[i][j][1] + 1 < self.unvisited_nodes[i+neighbor[0]][j+neighbor[1]][1] else self.unvisited_nodes[i+neighbor[0]][j+neighbor[1]][1]
-                            elif self.unvisited_nodes[i+neighbor[0]][j+neighbor[1]][0] == 3:
-                                self.done = True
-        
-        for node in temp_list:
-            self.unvisited_nodes[node[0]][node[1]][0] = 1
-            self.game[node[0]][node[1]] = 3
-            if self.check_var.get() == 1:
-                time.sleep(0.01)
-                self.draw_game()
-                self.canvas.update()
-
-    def find_path(self, old_i, old_j, i, j):
-        pass 
+    def heuristic(self, neighbor):
+        #d = math.sqrt((neighbor.i - game.end.i)**2 + (neighbor.j - game.end.j)**2)
+        d = abs(neighbor.i-game.end.i) + abs(neighbor.j-game.end.j)
+        return d
 
     def Run(self):
-        self.unvisited_nodes = [[[0,9999] for j in range(self.width//self.rect_side)] for i in range(self.height//self.rect_side)]
+        while True:
+            if len(game.openSet) > 0:
+                lowestIndex = 0
+                for i in range(len(game.openSet)):
+                    if game.openSet[i].f < game.openSet[lowestIndex].f:
+                        lowestIndex = i
 
-        for i in range(self.height//self.rect_side):
-            for j in range(self.width//self.rect_side):
-                if self.game[i][j] == 1:
-                    self.unvisited_nodes[i][j][0] = 4
-        
-        self.unvisited_nodes[self.points[0][0]][self.points[0][1]][0] = 2
-        self.unvisited_nodes[self.points[0][0]][self.points[0][1]][1] = 0
-        self.unvisited_nodes[self.points[1][0]][self.points[1][1]][0] = 3
+                current = game.openSet[lowestIndex]
 
-        self.visited_nodes = []
+                if current == game.end:
+                    path = []
+                    temp = current
+                    path.append(temp)
+                    while temp.previous != 0:
+                        path.append(temp.previous)
+                        temp = temp.previous
+                        
+                    for spot in path:
+                        spot.set_value(5)
+                    self.draw_game()
+                    return False
 
-        self.done = False
-     
-        while self.done == False:
-            self.find_visited()
+                game.openSet.remove(current)
+                game.closedSet.append(current)
 
-        #self.find_path(-1,-1,self.points[0][0], self.points[0][1])
+                neighbors = current.neighbors
+                for neighbor in neighbors:
+                    if neighbor not in game.closedSet and neighbor.get_value() != 1:
+                        tempG = current.g + 1
+                        newPath = False
+                        if neighbor in game.openSet:
+                            if tempG < neighbor.g:
+                                neighbor.g = tempG
+                                newPath = True
+                        else:
+                            neighbor.g = tempG
+                            newPath = True
+                            game.openSet.append(neighbor)
+                        if newPath:
+                            neighbor.h = self.heuristic(neighbor)
+                            neighbor.f = neighbor.g + neighbor.h
+                            neighbor.previous = current
+                            neighbor.set_value(3)
 
-        self.draw_game()
-        self.canvas.update()
+                    self.draw_game()
+                    time.sleep(0.0001)
+                    self.canvas.update()
+            else:
+                print('No solution')
+                return False
 
+game = Game()
 gui = GUI()
