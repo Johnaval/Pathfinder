@@ -1,4 +1,5 @@
 from tkinter import *
+from tkinter import messagebox
 import time
 import math
 
@@ -13,149 +14,46 @@ class Spot:
         self.f = 0
         self.g = 0
         self.h = 0
-        self.value = 0
-        self.color = 'white'
         self.neighbors = []
         self.previous = 0
+        self.wall = False
+        self.item = 0
 
     def add_neighbors(self, grid):
-        #neighbors = [[-1,0], [0,-1], [0,1], [1,0]]
-        neighbors = [[-1,-1], [-1,0], [-1,1], [0,1], [1,1], [1,0], [1,-1], [0,-1]]
+        #neighbors = [[-1,0], [0,-1], [0,1], [1,0]] #without diagonals
+        neighbors = [[-1,-1], [-1,0], [-1,1], [0,1], [1,1], [1,0], [1,-1], [0,-1]] #with diagonals
         for neighbor in neighbors:
             if self.i+neighbor[0] >= 0 and self.i+neighbor[0] < len(grid[0]) and self.j+neighbor[1] >= 0 and self.j+neighbor[1] < len(grid) and (self.i+neighbor[0] != game.start.i or self.j+neighbor[1] != game.start.j):
                 self.neighbors.append(grid[self.i+neighbor[0]][self.j+neighbor[1]])
-
-    def set_color(self):
-        if self.value == 0:
-            color = 'white'
-        elif self.value == 1:
-            color = 'black'
-        elif self.value == 2:
-            color = 'pink'
-        elif self.value == 3:
-            color = 'red'
-        elif self.value == 4:
-            color = 'magenta'
-        elif self.value == 5:
-            color = 'blue'
-        self.color = color
-    
-    def get_color(self):
-        return self.color
-
-    def set_value(self, value):
-        self.value = value
-        self.set_color()
-
-    def get_value(self):
-        return self.value
 
 class Game:
     def __init__(self):
         self.grid = [[Spot(i,j) for j in range(width//rect_side)] for i in range(height//rect_side)]
         self.openSet = []
         self.closedSet = []
+        self.path = []
 
-    def set_start(self, i, j):
-        self.start = self.grid[i][j]
-        self.openSet.append(self.start)
-
-    def set_end(self, i, j):
-        self.end = self.grid[i][j]
-    
-    def get_color(self, i, j):
-        return self.grid[i][j].get_color()
-
-    def set_value(self, i, j, value):
-        self.grid[i][j].set_value(value)
-
-    def get_value(self, i, j):
-        return self.grid[i][j].get_value()
-
-class GUI:
-    def __init__(self):
-        self.points = []
-
-        self.root = Tk()
-        self.root.title("Pathfinder")
-        self.root.resizable(FALSE,FALSE)
-
-        frame = Frame(self.root)
-        frame.grid(row = 0, column = 0)
-        self.check_var = IntVar()
-        c = Checkbutton(frame, text="I want to visualize", variable=self.check_var)
-        c.grid(row=0, column=0, padx=5, pady=5)
-        button = Button(frame, command = self.Run, text = "Run")
-        button.grid(row = 0, column = 1, padx = 5, pady = 5)
-
-        self.canvas = Canvas(self.root, bg = 'white', width = width, height = height, bd = 2, relief = RIDGE)
-        self.canvas.grid(row=1, column=0)
-        
-        self.draw_game()
-
-        self.mouse_clicked = 2
-        self.canvas.bind("<Motion>", self.mouse_movement)
-        self.canvas.bind('<Button 1>', self.mouse_click)
-        self.canvas.bind('<ButtonRelease-1>', self.mouse_release)
-
-        self.root.mainloop()
-
-    def draw_game(self):
-        self.canvas.delete(ALL)
-        increment = 5
-        for i in range(width//rect_side):
-            for j in range(height//rect_side):
-                x1 = increment + i * rect_side
-                y1 = increment + j * rect_side
-                x2 = x1 + rect_side
-                y2 = y1 + rect_side
-                color = game.get_color(i,j)
-                self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, tag = (i,j))
-
-    def change_rect_color(self, event, value, color):
-        item = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)[0]
-        tag = self.canvas.gettags(item)
-        i,j = int(tag[0]), int(tag[1])
-        if game.get_value(i,j) == 0:
-            game.set_value(i,j,value)
-            self.canvas.itemconfig(item, fill=color)
-            self.canvas.update()
-            
-    def mouse_movement(self, event):
-        if self.mouse_clicked == True:
-            self.change_rect_color(event, 1, 'black')
-    
-    def mouse_click(self, event):
-        if self.mouse_clicked == 2:
-            item = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)[0]
-            tag = self.canvas.gettags(item)
-            i,j = int(tag[0]), int(tag[1])
-            game.set_start(i,j)
-            self.points.append([i,j])
-            self.change_rect_color(event, 2, 'pink')
-        elif self.mouse_clicked == 3:
-            item = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)[0]
-            tag = self.canvas.gettags(item)
-            i,j = int(tag[0]), int(tag[1])
-            game.set_end(i,j)
-            self.points.append([i,j])
-            self.change_rect_color(event, 2, 'pink')
-            for i in range(height//rect_side):
-                for j in range(width//rect_side):
-                    game.grid[i][j].add_neighbors(game.grid)
-        else:
-            self.change_rect_color(event, 1, 'black')
-            self.mouse_clicked = True
-    
-    def mouse_release(self, event):
-        self.mouse_clicked = 3 if self.mouse_clicked == 2 else False
+    def define_gui(self, gui):
+        self.gui = gui
 
     def heuristic(self, neighbor):
-        #d = math.sqrt((neighbor.i - game.end.i)**2 + (neighbor.j - game.end.j)**2)
-        d = abs(neighbor.i-game.end.i) + abs(neighbor.j-game.end.j)
+        #d = math.sqrt((neighbor.i - game.end.i)**2 + (neighbor.j - game.end.j)**2) #Euclidian distance
+        d = abs(neighbor.i-game.end.i) + abs(neighbor.j-game.end.j) #Manhattan distance
         return d
-
+    
     def Run(self):
+        if gui.start == 0 or gui.end == 0:
+            messagebox.showerror('Error', 'First define start and end')
+            return False
+
+        self.start = self.grid[self.gui.start[0]][self.gui.start[1]]
+        self.openSet.append(self.start)
+        self.end = self.grid[self.gui.end[0]][self.gui.end[1]]
+
+        for i in range(height//rect_side):
+            for j in range(width//rect_side):
+                game.grid[i][j].add_neighbors(game.grid)
+
         while True:
             if len(game.openSet) > 0:
                 lowestIndex = 0
@@ -166,16 +64,14 @@ class GUI:
                 current = game.openSet[lowestIndex]
 
                 if current == game.end:
-                    path = []
+                    self.path = []
                     temp = current
-                    path.append(temp)
+                    self.path.append(temp)
                     while temp.previous != 0:
-                        path.append(temp.previous)
+                        self.path.append(temp.previous)
                         temp = temp.previous
                         
-                    for spot in path:
-                        spot.set_value(5)
-                    self.draw_game()
+                    self.gui.update_game()
                     return False
 
                 game.openSet.remove(current)
@@ -183,7 +79,7 @@ class GUI:
 
                 neighbors = current.neighbors
                 for neighbor in neighbors:
-                    if neighbor not in game.closedSet and neighbor.get_value() != 1:
+                    if neighbor not in game.closedSet and neighbor.wall == False:
                         tempG = current.g + 1
                         newPath = False
                         if neighbor in game.openSet:
@@ -198,14 +94,99 @@ class GUI:
                             neighbor.h = self.heuristic(neighbor)
                             neighbor.f = neighbor.g + neighbor.h
                             neighbor.previous = current
-                            neighbor.set_value(3)
 
-                    self.draw_game()
-                    time.sleep(0.0001)
-                    self.canvas.update()
+                    if gui.check_var.get() == 1:
+                        self.gui.update_game()
             else:
-                print('No solution')
+                self.gui.update_game()
+                messagebox.showerror('Error', 'No solution')
                 return False
+
+class GUI:
+    def __init__(self):
+        self.start = 0
+        self.end = 0
+
+        self.root = Tk()
+        self.root.title("Pathfinder")
+        self.root.resizable(FALSE,FALSE)
+
+        frame = Frame(self.root)
+        frame.grid(row = 0, column = 0)
+        self.check_var = IntVar()
+        c = Checkbutton(frame, text="I want to visualize", variable=self.check_var)
+        c.grid(row=0, column=0, padx=5, pady=5)
+        button = Button(frame, command = game.Run, text = "Run")
+        button.grid(row = 0, column = 1, padx = 5, pady = 5)
+
+        self.canvas = Canvas(self.root, bg = 'white', width = width, height = height, bd = 2, relief = RIDGE)
+        self.canvas.grid(row=1, column=0)
+        
+        self.draw_game()
+
+        self.mouse_clicked = 2
+        self.canvas.bind("<Motion>", self.mouse_movement)
+        self.canvas.bind('<Button 1>', self.mouse_click)
+        self.canvas.bind('<ButtonRelease-1>', self.mouse_release)
+
+    def draw_game(self):
+        increment = 5
+        for i in range(width//rect_side):
+            for j in range(height//rect_side):
+                x1 = increment + i * rect_side
+                y1 = increment + j * rect_side
+                x2 = x1 + rect_side
+                y2 = y1 + rect_side
+                item = self.canvas.create_rectangle(x1, y1, x2, y2, fill='white', tag = (i,j))
+                game.grid[i][j].item = item
+
+    def update_game(self):
+        for spot in game.openSet:
+            self.canvas.itemconfig(spot.item, fill='magenta')
+            self.canvas.update()
+
+        for spot in game.closedSet:
+            self.canvas.itemconfig(spot.item, fill='red')
+            self.canvas.update()
+
+        for spot in game.path:
+            self.canvas.itemconfig(spot.item, fill='blue')
+            self.canvas.update()
+            
+    def change_rect_color(self, item, color):
+        self.canvas.itemconfigure(item, fill=color)
+        self.canvas.update()
+    
+    def mouse_movement(self, event):
+        try:
+            item = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)[0]
+            tag = self.canvas.gettags(item)
+            i,j = int(tag[0]), int(tag[1])
+        except: pass
+        if self.mouse_clicked == True and [i,j] != self.start and [i,j] != self.end:
+            self.change_rect_color(item, 'black')
+            game.grid[i][j].wall = True
+    
+    def mouse_click(self, event):
+        item = self.canvas.find_overlapping(event.x, event.y, event.x, event.y)[0]
+        tag = self.canvas.gettags(item)
+        i,j = int(tag[0]), int(tag[1])
+        if self.mouse_clicked == 2:
+            self.start = [i,j]
+            self.change_rect_color(item, 'pink')
+        elif self.mouse_clicked == 3:
+            self.end = [i,j]
+            self.change_rect_color(item, 'pink')
+        else:
+            if [i,j] != self.start and [i,j] != self.end:
+                self.change_rect_color(item, 'black')
+                game.grid[i][j].wall = True
+                self.mouse_clicked = True
+    
+    def mouse_release(self, event):
+        self.mouse_clicked = 3 if self.mouse_clicked == 2 else False
 
 game = Game()
 gui = GUI()
+game.define_gui(gui)
+gui.root.mainloop()
